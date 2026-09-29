@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gold Intelligence Decision Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #111827;
+      --border: #1f2937;
+      --gold: #f59e0b;
+      --bullion-green: #10b981;
+      --etf-yellow: #f59e0b;
+      --sell-red: #ef4444;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --blue: #3b82f6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 20px; line-height: 1.5; }
+    .disclaimer-banner { background: #131b2e; border: 1px solid #25334d; border-left: 4px solid var(--gold); border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; font-size: 11px; line-height: 1.6; color: #94a3b8; }
+    .disclaimer-banner strong { color: #f8fafc; font-weight: 700; text-transform: uppercase; }
+    .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--border); padding-bottom: 14px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+    .header h1 { font-size: 22px; color: #fff; display: flex; align-items: center; gap: 8px; }
+    .header .meta { font-size: 12px; color: var(--muted); text-align: right; }
+    .refresh-container { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+    .refresh-badge { display: inline-flex; align-items: center; gap: 5px; background: rgba(16,185,129,0.15); color: #34d399; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .btn-refresh { display: inline-flex; align-items: center; gap: 5px; background: #1e293b; color: #f9fafb; border: 1px solid #374151; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; }
+    .btn-refresh:hover { background: var(--gold); color: #000; }
+    .signals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+    .card.green-border { border-top: 4px solid var(--bullion-green); }
+    .card.yellow-border { border-top: 4px solid var(--etf-yellow); }
+    .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 700; padding: 4px 12px; border-radius: 9999px; margin: 6px 0; }
+    .badge-accumulate { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+    .badge-hold { background: #451a03; color: #fcd34d; border: 1px solid #d97706; }
+    .price-box { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; }
+    .price-val { font-size: 26px; font-weight: 700; color: #fff; }
+    .price-change { font-size: 13px; font-weight: 600; }
+    .metric-list { list-style: none; margin-top: 12px; font-size: 13px; }
+    .metric-list li { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #1e293b; color: var(--muted); }
+    .metric-list li span:last-child { color: var(--text); font-weight: 500; }
+    .chart-container { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 20px; }
+    .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .btn-group { display: flex; gap: 6px; }
+    .btn { background: #1f2937; border: none; color: var(--muted); padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 11px; font-weight: 600; }
+    .btn:hover, .btn.active { background: var(--gold); color: #000; }
+    .canvas-wrap { position: relative; height: 320px; width: 100%; }
+    .formula-section { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-top: 20px; font-size: 12px; color: var(--muted); }
+    .formula-box { background: #0b0f19; border: 1px solid #1f2937; padding: 10px; border-radius: 6px; font-family: monospace; color: #e5e7eb; margin: 6px 0; overflow-x: auto; }
+  </style>
+</head>
+<body>
+
+  <div class="disclaimer-banner">
+    <strong>Regulatory Disclaimer & Non-Reliance Disclosure:</strong> 
+    The data, automated algorithms, conviction indices, and telemetry presented on this site are compiled solely for informational, statistical, and educational purposes and do not constitute investment, financial, legal, tax, or professional advice. You bear sole responsibility for evaluating the merits and risks associated with any data before making financial decisions.
+  </div>
+
+  <div class="header">
+    <div>
+      <h1><span>🪙</span> Gold Intelligence Decision Dashboard</h1>
+      <p style="color: var(--muted); font-size: 13px;">GitHub Actions Cron & Dual-Signal Engine</p>
+    </div>
+    <div class="meta">
+      <div>Last Refreshed: <span id="sync-time" style="color: #fff; font-weight: 600;">Loading...</span></div>
+      <div class="refresh-container">
+        <div class="refresh-badge"><span>●</span> Cron Synced Every 6 Hours</div>
+        <button id="btn-manual-refresh" class="btn-refresh" onclick="loadRemoteData()">Refresh Now</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="signals-grid">
+    <div class="card green-border">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <span style="font-size:11px; font-weight:700; color:#10b981; background:rgba(16,185,129,0.15); padding:3px 8px; border-radius:4px;">PHYSICAL BULLION</span>
+          <h2 style="font-size: 17px; margin-top: 4px;">Physical Bullion Signal</h2>
+        </div>
+        <div class="badge badge-accumulate">🟢 STRONG ACCUMULATE</div>
+      </div>
+      <div class="price-box">
+        <div class="price-val" id="spot-price">$-- <span style="font-size: 13px; color: var(--muted); font-weight: 400;">/ oz</span></div>
+        <div class="price-change" id="spot-change" style="color:#ef4444;">--</div>
+      </div>
+      <p style="font-size: 12px; color: #d1d5db; margin: 6px 0;">
+        <strong>Conviction: <span id="bullion-conviction">--%</span></strong> | Sovereign de-dollarization (PBoC, RBI) establishes a structural floor.
+      </p>
+      <ul class="metric-list">
+        <li><span>Central Bank Accumulation:</span> <span id="cb-metric">~72 t/mo</span></li>
+        <li><span>SGE Delivery Premium:</span> <span id="sge-metric">+$18.40/oz</span></li>
+        <li><span>Action Rule:</span> <span style="color: #6ee7b7; font-weight: 700;">Buy physical coins/bars on dips</span></li>
+      </ul>
+    </div>
+
+    <div class="card yellow-border">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <span style="font-size:11px; font-weight:700; color:#f59e0b; background:rgba(245,158,11,0.15); padding:3px 8px; border-radius:4px;">TACTICAL ETF</span>
+          <h2 style="font-size: 17px; margin-top: 4px;">Gold ETF (GLD) Signal</h2>
+        </div>
+        <div class="badge badge-hold">🟡 HOLD / TACTICAL BUY</div>
+      </div>
+      <div class="price-box">
+        <div class="price-val" id="gld-price">$-- <span style="font-size: 13px; color: var(--muted); font-weight: 400;">/ share</span></div>
+        <div class="price-change" id="gld-change" style="color:#ef4444;">--</div>
+      </div>
+      <p style="font-size: 12px; color: #d1d5db; margin: 6px 0;">
+        <strong>Conviction: <span id="etf-conviction">--%</span></strong> | Dip-buying absorbs selling, while 10Y TIPS real yields cap breakout momentum.
+      </p>
+      <ul class="metric-list">
+        <li><span>Real Yield Drag:</span> <span id="tips-metric">10Y TIPS @ 1.78%</span></li>
+        <li><span>Dollar Pressure:</span> <span id="dxy-metric">DXY @ 104.20</span></li>
+        <li><span>Action Rule:</span> <span style="color: #fcd34d; font-weight: 700;">Hold core; add on 200-EMA support</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="chart-container">
+    <div class="chart-header">
+      <h2>90-Day Trajectory: Spot Gold vs. SPDR GLD ETF</h2>
+      <div class="btn-group">
+        <button class="btn" onclick="zoomPreset(chartPrice, 30)">1M</button>
+        <button class="btn" onclick="zoomPreset(chartPrice, 60)">2M</button>
+        <button class="btn active" onclick="chartPrice.resetZoom()">All 90D</button>
+      </div>
+    </div>
+    <div class="canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div class="chart-header">
+      <h2>90-Day Historical Conviction Trend (%)</h2>
+      <div class="btn-group">
+        <button class="btn" onclick="zoomPreset(chartConviction, 30)">1M</button>
+        <button class="btn" onclick="zoomPreset(chartConviction, 60)">2M</button>
+        <button class="btn active" onclick="chartConviction.resetZoom()">All 90D</button>
+      </div>
+    </div>
+    <div class="canvas-wrap"><canvas id="convictionChart"></canvas></div>
+  </div>
+
+  <div class="formula-section">
+    <h3 style="color:#fff; margin-bottom:6px;">Signal Formulas & Methodology</h3>
+    <div class="formula-box">Bullion Conviction = Clip(50 + 0.40 × (CB_Purchases - 35) + 0.50 × (SGE_Prem - 5) + 0.15 × (DXY - 100))</div>
+    <div class="formula-box">GLD Conviction = Clip(50 - 15.0 × (TIPS_10Y - 1.50) + 5.0 × (ETF_NetFlows_B) - 0.25 × (DXY - 100))</div>
+  </div>
+
+  <script>
+    let chartPrice, chartConviction;
+
+    function initCharts() {
+      chartPrice = new Chart(document.getElementById('priceChart').getContext('2d'), {
+        type: 'line',
+        data: { labels: [], datasets: [
+          { label: 'Spot Gold ($/oz)', data: [], borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)', borderWidth: 2.5, yAxisID: 'ySpot' },
+          { label: 'GLD ETF ($/sh)', data: [], borderColor: '#3b82f6', borderDash: [4, 4], borderWidth: 2, yAxisID: 'yGLD' }
+        ]},
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af' } },
+            ySpot: { type: 'linear', position: 'left', grid: { color: '#1f2937' }, ticks: { color: '#f59e0b', callback: v => '$' + v.toLocaleString() } },
+            yGLD: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#3b82f6', callback: v => '$' + v } }
+          },
+          plugins: { zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } } }
+        }
+      });
+
+      chartConviction = new Chart(document.getElementById('convictionChart').getContext('2d'), {
+        type: 'line',
+        data: { labels: [], datasets: [
+          { label: 'Bullion Conviction (%)', data: [], borderColor: '#10b981', borderWidth: 2.5 },
+          { label: 'GLD ETF Conviction (%)', data: [], borderColor: '#f59e0b', borderDash: [3, 3], borderWidth: 2 }
+        ]},
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af' } },
+            y: { min: 40, max: 100, grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', callback: v => v + '%' } }
+          },
+          plugins: { zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } } }
+        }
+      });
+    }
+
+    function zoomPreset(chart, days) {
+      if (!chart) return;
+      chart.resetZoom();
+      const pts = chart.data.labels.length;
+      const count = Math.max(3, Math.round((days / 90) * pts));
+      chart.zoomScale('x', { min: pts - count, max: pts - 1 }, 'default');
+    }
+
+    async function loadRemoteData() {
+      try {
+        const res = await fetch('./data.json?t=' + Date.now());
+        if (!res.ok) throw new Error('data.json not ready yet');
+        const d = await res.json();
+
+        // Update DOM
+        document.getElementById('sync-time').innerText = new Date(d.timestamp_utc).toLocaleString(undefined, {
+          weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
+        });
+        document.getElementById('spot-price').innerHTML = `$${d.spot.price.toLocaleString(undefined, {minimumFractionDigits:2})} <span style="font-size:13px; color:var(--muted); font-weight:400;">/ oz</span>`;
+        document.getElementById('spot-change').innerText = `${d.spot.change > 0 ? '▲ +' : '▼ '}${d.spot.change}%`;
+        document.getElementById('gld-price').innerHTML = `$${d.gld.price.toLocaleString(undefined, {minimumFractionDigits:2})} <span style="font-size:13px; color:var(--muted); font-weight:400;">/ share</span>`;
+        document.getElementById('gld-change').innerText = `${d.gld.change > 0 ? '▲ +' : '▼ '}${d.gld.change}%`;
+        
+        document.getElementById('bullion-conviction').innerText = `${d.conviction.bullion}%`;
+        document.getElementById('etf-conviction').innerText = `${d.conviction.etf}%`;
+
+        // Update Charts
+        chartPrice.data.labels = d.history.labels;
+        chartPrice.data.datasets[0].data = d.history.spot;
+        chartPrice.data.datasets[1].data = d.history.gld;
+        chartPrice.update('none');
+
+        chartConviction.data.labels = d.history.labels;
+        chartConviction.data.datasets[0].data = d.history.bullion_conv;
+        chartConviction.data.datasets[1].data = d.history.etf_conv;
+        chartConviction.update('none');
+      } catch (err) {
+        console.warn('Waiting for data.json generation:', err);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initCharts();
+      loadRemoteData();
+      setInterval(loadRemoteData, 60000); // Check every minute for newly generated cron commits
+    });
+  </script>
+</body>
+</html>
