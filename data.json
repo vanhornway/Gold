@@ -1,12 +1,12 @@
 {
-  "timestamp_utc": "2026-10-21 16:39 UTC",
+  "timestamp_utc": "2026-10-21 21:16 UTC",
   "spot": {
     "price": 4119.55,
     "change": -3.85
   },
   "gld": {
-    "price": 378.58,
-    "change": 0.69
+    "price": 378.95,
+    "change": 0.79
   },
   "conviction": {
     "bullion": 72,
@@ -65,7 +65,7 @@
       382.01,
       379.69,
       377.65,
-      378.58
+      378.95
     ],
     "bullion_conv": [
       72,
